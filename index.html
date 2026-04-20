@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>DevOps Attendance – Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css?v=8.1">
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js?v=2.0"></script>
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      width: 100%;
+    }
+    .login-box {
+      background: #faf5ff; border-radius: 20px; padding: 32px 28px;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      box-shadow: 0 8px 40px rgba(124,58,237,0.18);
+      animation: fadeIn 0.3s ease;
+      margin: auto;
+    }
+    .login-logo { text-align: center; margin-bottom: 24px; }
+    .login-logo .icon { font-size: 44px; color: var(--purple); }
+    .login-logo h1 { font-weight: 700; font-size: 20px; color: var(--text); margin-top: 12px; line-height: 1.3; }
+    .invite-hint { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #065f46; margin-bottom: 14px; text-align: center; }
+    #register-section { display: none; }
+
+    /* Password eye */
+    .pw-wrap { position: relative; margin-bottom: 12px; }
+    .pw-wrap .text-input { padding-right: 44px; }
+    .pw-eye { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted); background: none; border: none; padding: 0; display: flex; align-items: center; font-size: 15px; }
+    .pw-eye:hover { color: var(--purple); }
+
+    /* Select */
+    .select-input {
+      width: 100%;
+      padding: 12px 14px 12px 42px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 16px; outline: none; background: white;
+      color: var(--text);
+      transition: border-color 0.2s;
+      appearance: none; font-family: inherit;
+    }
+    .select-input:focus { border-color: var(--purple); }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.show { display: flex; }
+    .modal-box { background: white; border-radius: 16px; padding: 28px 24px; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.25); animation: fadeIn 0.2s ease; margin: auto; }
+    .modal-icon  { font-size: 38px; margin-bottom: 10px; }
+    .modal-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .modal-msg   { font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 18px; }
+    .modal-close { background: var(--purple); color: white; border: none; padding: 12px 28px; border-radius: 10px; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 15px; }
+
+    @media (max-width: 440px) {
+      .login-box { padding: 24px 16px; border-radius: 16px; }
+      .login-logo h1 { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-icon">🚫</div>
+      <div class="modal-title" id="modal-title">Code Expired</div>
+      <div class="modal-msg" id="modal-msg">This invite code has already been used.</div>
+      <button class="modal-close" onclick="closeModal()">OK, Got it</button>
+    </div>
+  </div>
+
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon"><i class="fa-solid fa-building-columns"></i></div>
+      <h1>Fundamental of DevOps –<br>AIML / IT1 / IT2</h1>
+    </div>
+
+    <div id="login-section">
+      <div class="input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-envelope"></i></span>
+        <input id="login-email" class="text-input" type="email" placeholder="Email ID"/>
+      </div>
+      <div class="pw-wrap input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+        <input id="login-password" class="text-input" type="password" placeholder="Password" onkeydown="if(event.key==='Enter') loginUser()"/>
+        <button class="pw-eye" type="button" onclick="togglePw('login-password','eye-login')" tabindex="-1">
+          <i class="fa-solid fa-eye" id="eye-login"></i>
+        </button>
+      </div>
+      <p id="login-error" class="error-text" style="display:none;"></p>
+      <button class="btn-primary" onclick="loginUser()" id="login-btn" style="margin-bottom:16px;">LOGIN</button>
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+      <div class="input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-key"></i></span>
+        <input id="invite-code-input" class="text-input" type="text" placeholder="New User? Enter Invite Code..."/>
+      </div>
+      <button class="btn-register-cta" onclick="goToRegister()">Register Here Now</button>
+      <p id="login-bottom-msg" class="info-text" style="margin-top:8px;text-align:center;display:none;"></p>
+    </div>
+
+    <div id="register-section">
+      <h2 style="color:var(--purple);margin-bottom:16px;font-size:18px;text-align:center;">🎓 Create Account</h2>
+      <div class="invite-hint">Invite Code: <strong id="invite-code-display"></strong></div>
+
+      <div class="input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-user"></i></span>
+        <input id="reg-name" class="text-input" type="text" placeholder="Full Name"/>
+      </div>
+      <div class="input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+        <input id="reg-enrollment" class="text-input" type="text" placeholder="Enrollment Number"/>
+      </div>
+      <div class="input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-code-branch"></i></span>
+        <select id="reg-branch" class="select-input">
+          <option value="" disabled selected>Select Branch</option>
+          <option value="AIML">AIML</option>
+          <option value="IT1">IT1</option>
+          <option value="IT2">IT2</option>
+          <option value="CS">CS</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-layer-group"></i></span>
+        <select id="reg-sem" class="select-input">
+          <option value="" disabled selected>Select Semester</option>
+          <option value="1">Semester 1</option><option value="2">Semester 2</option>
+          <option value="3">Semester 3</option><option value="4">Semester 4</option>
+          <option value="5">Semester 5</option><option value="6">Semester 6</option>
+          <option value="7">Semester 7</option><option value="8">Semester 8</option>
+        </select>
+      </div>
+      <div class="input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-envelope"></i></span>
+        <input id="reg-email" class="text-input" type="email" placeholder="Email ID"/>
+      </div>
+      <div class="pw-wrap input-wrap">
+        <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+        <input id="reg-password" class="text-input" type="password" placeholder="Password (min 6 chars)"/>
+        <button class="pw-eye" type="button" onclick="togglePw('reg-password','eye-reg')" tabindex="-1">
+          <i class="fa-solid fa-eye" id="eye-reg"></i>
+        </button>
+      </div>
+
+      <p id="reg-error" class="error-text" style="display:none;"></p>
+      <button class="btn-primary" onclick="registerUser()" id="reg-btn" style="margin-bottom:12px;">REGISTER</button>
+      <button onclick="goToLogin()" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:white;cursor:pointer;font-size:14px;color:var(--text-muted);font-family:inherit;font-weight:600;">← Back to Login</button>
+    </div>
+  </div>
+
+  <script>
+    let isRegistering = false;
+
+    auth.onAuthStateChanged(async function(user) {
+      if (user && !isRegistering) {
+        const doc = await db.collection('users').doc(user.uid).get();
+        window.location.href = (doc.exists && doc.data().role === 'admin') ? 'admin.html' : 'student.html';
+      }
+    });
+
+    function togglePw(inputId, iconId) {
+      const inp = document.getElementById(inputId);
+      const ico = document.getElementById(iconId);
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      ico.className = inp.type === 'text' ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    }
+
+    function showModal(title, msg) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-msg').textContent   = msg;
+      document.getElementById('modal-overlay').classList.add('show');
+    }
+    function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
+
+    async function goToRegister() {
+      const code = document.getElementById('invite-code-input').value.trim().toUpperCase();
+      if (!code) { showBottomMsg('Please enter an invite code first'); return; }
+      
+      try {
+        const codeDoc = await db.collection('inviteCodes').doc(code).get();
+        if (!codeDoc.exists) {
+          showModal('Invalid Code', 'This invite code does not exist. Please check and try again.'); return;
+        }
+        if (codeDoc.data().used) {
+          showModal('Code Already Used', 'This invite code has already been used. Please ask the admin for a new code.'); return;
+        }
+      } catch(e) { showBottomMsg('Error checking code. Please try again.'); return; }
+
+      document.getElementById('invite-code-display').textContent = code;
+      document.getElementById('login-section').style.display    = 'none';
+      document.getElementById('register-section').style.display = 'block';
+    }
+
+    function goToLogin() {
+      document.getElementById('register-section').style.display = 'none';
+      document.getElementById('login-section').style.display    = 'block';
+    }
+
+    async function loginUser() {
+      const email    = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      if (!email || !password) { showBottomMsg('Please enter email and password'); return; }
+      setLoginLoading(true);
+      try { await auth.signInWithEmailAndPassword(email, password); }
+      catch(e) { showLoginError(friendlyError(e.code)); setLoginLoading(false); }
+    }
+    
+    function setLoginLoading(on) {
+      const btn = document.getElementById('login-btn');
+      btn.disabled = on; btn.textContent = on ? '⟳ Logging in...' : 'LOGIN';
+    }
+
+    async function registerUser() {
+      const inviteCode = document.getElementById('invite-code-display').textContent.trim().toUpperCase();
+      const name       = document.getElementById('reg-name').value.trim();
+      const enrollment = document.getElementById('reg-enrollment').value.trim().toUpperCase();
+      const branch     = document.getElementById('reg-branch').value;
+      const sem        = document.getElementById('reg-sem').value;
+      const email      = document.getElementById('reg-email').value.trim();
+      const password   = document.getElementById('reg-password').value;
+
+      if (!name || !enrollment || !branch || !sem || !email || !password) {
+        showRegError('All fields are required.'); return;
+      }
+      if (password.length < 6) {
+        showRegError('Password must be at least 6 characters.'); return;
+      }
+
+      setRegLoading(true);
+      const codeRef = db.collection('inviteCodes').doc(inviteCode);
+
+      try {
+        const codeSnap = await codeRef.get();
+        if (!codeSnap.exists) {
+          showModal('Invalid Code ❌', 'This invite code does not exist.');
+          setRegLoading(false); return;
+        }
+        if (codeSnap.data().used) {
+          showModal('Code Already Used', 'This invite code has already been used.');
+          setRegLoading(false); return;
+        }
+        const codeRole = codeSnap.data().role || 'student';
+
+        // Mark code used FIRST to prevent race conditions
+        await codeRef.update({ used: true });
+
+        isRegistering = true;
+        let uid;
+        try {
+          const cred = await auth.createUserWithEmailAndPassword(email, password);
+          uid = cred.user.uid;
+        } catch(authErr) {
+          isRegistering = false;
+          await codeRef.update({ used: false }); // Rollback!
+          throw authErr;
+        }
+
+        const defaultClasses = [
+          { date: '12-03-2026', attended: false }, { date: '20-03-2026', attended: false },
+          { date: '27-03-2026', attended: false }, { date: '02-04-2026', attended: false },
+          { date: '03-04-2026', attended: false }, { date: '10-04-2026', attended: false }
+        ];
+
+        await db.collection('users').doc(uid).set({
+          name, email, enrollmentNo: enrollment,
+          branch, semester: sem, role: codeRole,
+          attendance: 0, oldAttendance: 0,
+          proxyFlag: false, classes: defaultClasses,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        await db.collection('marks').doc(uid).set({
+          categories: [
+            { name: 'Mid Term Marks',  obtained: '', max: 30 },
+            { name: 'End Sem Marks',   obtained: '', max: 60 },
+            { name: 'Practical Marks', obtained: '', max: 15 },
+            { name: 'CAP Marks',       obtained: '', max: 10 }
+          ]
+        });
+
+        await codeRef.delete(); // Code successfully used and removed
+        
+        isRegistering = false;
+        window.location.href = codeRole === 'admin' ? 'admin.html' : 'student.html';
+
+      } catch(e) {
+        isRegistering = false;
+        showRegError(friendlyError(e.code) || e.message);
+        setRegLoading(false);
+      }
+    }
+
+    function setRegLoading(on) {
+      const btn = document.getElementById('reg-btn');
+      btn.disabled = on; btn.textContent = on ? '⟳ Registering...' : 'REGISTER';
+    }
+
+    function showLoginError(msg) { const el = document.getElementById('login-error'); el.textContent = msg; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 4000); }
+    function showRegError(msg)   { const el = document.getElementById('reg-error'); el.textContent = msg; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 5000); }
+    function showBottomMsg(msg)  { const el = document.getElementById('login-bottom-msg'); el.textContent = msg; el.style.display = 'block'; setTimeout(() => { el.style.display = 'none'; }, 4000); }
+    function friendlyError(code) {
+      const m = {
+        'auth/user-not-found':       'No account found with this email.',
+        'auth/wrong-password':       'Incorrect password. Try again.',
+        'auth/invalid-email':        'Please enter a valid email address.',
+        'auth/email-already-in-use': 'This email is already registered.',
+        'auth/invalid-credential':   'Invalid email or password.'
+      };
+      return m[code] || 'Something went wrong. Please try again.';
+    }
+  </script>
+</body>
+</html>

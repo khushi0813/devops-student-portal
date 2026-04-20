@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Students Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=8.0">
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js?v=2.0"></script>
+
+  <style>
+    /* Page-specific styles only — layout handled by style.css */
+    .profile-card  { display: flex; align-items: center; gap: 16px; }
+    .avatar-wrap   { flex-shrink: 0; }
+    .avatar {
+      width: 68px; height: 68px; border-radius: 50%;
+      overflow: hidden; display: flex; justify-content: center; align-items: center;
+      box-shadow: 0 4px 14px rgba(124,58,237,0.25);
+      background: var(--purple); border: 3px solid var(--purple-light);
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .profile-info h2 { font-size: 20px; color: var(--purple-dark); margin-bottom: 4px; font-weight: 700; }
+    .profile-info p  { font-size: 13px; color: var(--text-muted); margin-bottom: 2px; }
+    .proxy-badge { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .proxy-badge.clean { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+
+    .att-section-label { font-size: 13px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: white; background: #be185d; display: inline-block; padding: 4px 14px; border-radius: 6px; margin-bottom: 14px; }
+    .progress-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 700; color: var(--text); }
+    .progress-header span:last-child { color: var(--purple); }
+    .progress-subtext { font-size: 12px; color: var(--text-muted); margin-top: 8px; text-align: right; font-weight: 600; }
+
+    .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-out; }
+
+    .section-header-teal   { display: flex; align-items: center; gap: 8px; background: var(--teal);   color: white; margin: -18px -18px 18px -18px; padding: 14px 18px; border-radius: 14px 14px 0 0; font-weight: 600; }
+    .section-header-orange { display: flex; align-items: center; gap: 8px; background: var(--orange); color: white; margin: -18px -18px 18px -18px; padding: 14px 18px; border-radius: 14px 14px 0 0; font-weight: 600; }
+
+    .assignment-row { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); align-items: center; }
+    .assignment-row:last-child { border-bottom: none; }
+    .assign-number  { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
+    .assign-details { flex-grow: 1; min-width: 0; }
+    .assign-title    { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--text); }
+    .assign-deadline { font-size: 12px; color: var(--text-muted); }
+
+    .feedback-box      { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 10px; }
+    .feedback-textarea { width: 100%; border: none; resize: none; outline: none; font-family: inherit; font-size: 14px; min-height: 70px; background: transparent; }
+    .feedback-actions  { display: flex; justify-content: flex-end; margin-top: 10px; }
+    .feedback-btn      { background: var(--purple); border: none; color: white; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px 16px; border-radius: 8px; font-family: inherit; font-size: 14px; }
+
+    .toast-popup {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #1f2937; color: white; padding: 12px 22px; border-radius: 12px;
+      font-size: 14px; font-weight: 600; z-index: 9999; opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      display: flex; align-items: center; gap: 8px; max-width: 90vw;
+    }
+    .toast-popup.show    { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast-popup.success { background: #059669; }
+    .toast-popup.error   { background: #dc2626; }
+    .toast-popup.info    { background: #7c3aed; }
+
+    .app-footer { text-align: center; padding: 22px 16px 28px; background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%); margin-top: 0; line-height: 2.2; }
+    .app-footer .footer-credit { font-size: 15px; font-weight: 700; color: white; display: block; }
+    .app-footer .footer-heart  { color: #fda4af; }
+    .live-clock { text-align:center; font-family:'Space Mono',monospace; font-size:12px; color:var(--text-muted); padding:14px; background:white; border-radius:10px; border:1px solid var(--border); letter-spacing:0.4px; box-shadow:0 1px 4px rgba(0,0,0,0.05); margin-bottom:0; }
+    .live-clock .clock-time { font-size:22px; font-weight:700; color:var(--purple); display:block; margin-bottom:4px; letter-spacing:2px; font-family:'Space Mono',monospace; }
+    }
+    @media (max-width: 480px) {
+      .profile-info h2 { font-size: 17px; }
+      .avatar { width: 58px; height: 58px; }
+      .section-header-teal, .section-header-orange { font-size: 14px; }
+    }
+  </style>
+</head>
+
+<body class="page-wrap">
+  <div class="toast-popup" id="toast-popup"></div>
+
+  <!-- HEADER -->
+  <div class="top-header">
+    <h1 style="flex:1;text-align:center;margin-left:36px;">My DevOps Status</h1>
+    <span class="material-icons"
+      style="cursor:pointer;color:rgba(255,255,255,0.85);font-size:22px;background:rgba(255,255,255,0.15);border-radius:8px;padding:6px;flex-shrink:0;"
+      onclick="logout()">logout</span>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="page-content" id="main-content" style="display:none;">
+
+    <!-- PROFILE -->
+    <div class="card-purple profile-card">
+      <div class="avatar-wrap">
+        <div class="avatar" id="avatar-wrap">
+          <span class="material-icons" style="color:white;font-size:34px;">person</span>
+        </div>
+      </div>
+      <div class="profile-info">
+        <h2 id="student-name">Loading...</h2>
+        <p>Enrollment: <span id="student-enrollment">--</span></p>
+        <p id="student-branch-sem">Branch: -- | Sem: --</p>
+        <div id="proxy-badge-wrap"></div>
+      </div>
+    </div>
+    <!-- ATTENDANCE PROGRESS -->
+    <div class="card">
+      <div class="att-section-label">Attendance Progress</div>
+      <div class="progress-header">
+        <span>Overall Attendance</span>
+        <span id="attendance-count">0 / 6 Days</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="attendance-bar" style="width:0%;"></div>
+      </div>
+      <div class="progress-subtext" id="attendance-percent">0.0%</div>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:8px;text-align:center;">
+        Includes old class attendance = <span id="old-attendance">0</span>
+      </p>
+    </div>
+
+    <!-- VIEW DETAILS -->
+    <div class="details-card">
+      <div class="details-header" onclick="toggleAccordion()">
+        <div class="details-header-left">
+          <span class="material-icons" style="color:var(--purple);font-size:28px;">grid_on</span>
+          <div class="details-header-text">
+            <h3>View Details</h3>
+            <p id="details-subtitle">Loading...</p>
+          </div>
+        </div>
+        <span class="material-icons" id="accordion-icon" style="color:var(--purple);">expand_more</span>
+      </div>
+      <div class="accordion-content" id="attendance-details">
+        <table class="attendance-table">
+          <thead><tr><th>#</th><th>Date</th><th>Status</th></tr></thead>
+          <tbody id="attendance-list"></tbody>
+        </table>
+      </div>
+    </div>
+    <br>
+    <!-- MARK ATTENDANCE -->
+    <div style="margin-bottom:16px;">
+      <button id="mark-attendance-btn" class="btn-disabled" disabled onclick="markMyAttendance()">
+        <span class="material-icons" id="btn-icon" style="font-size:20px;">lock</span>
+        <span id="btn-text">ATTENDANCE DISABLED</span>
+      </button>
+    </div>
+
+    <!-- ASSIGNMENTS -->
+    <div class="card" style="padding:18px;">
+      <div class="section-header-teal">
+        <span class="material-icons">assignment_turned_in</span> Assignment Submissions
+      </div>
+      <div id="assignments-container"></div>
+    </div>
+
+    <!-- MARKS -->
+    <div class="card" style="padding:18px;">
+      <div class="section-header-orange">
+        <span class="material-icons">bar_chart</span> Mid / End Sem Marks
+      </div>
+      <div id="marks-container">
+        <!-- Populated by JS — default shown immediately, no empty state -->
+      </div>
+      <div class="marks-total-box">
+        <span class="marks-total-label">
+          <span class="material-icons" style="vertical-align:middle;margin-right:6px;">calculate</span>Total Marks
+        </span>
+        <span class="marks-total-value" id="total-marks">0 / 115</span>
+      </div>
+    </div>
+
+    <!-- FEEDBACK -->
+    <div class="card">
+      <div class="section-title" style="color:var(--text);">Your Comments / Suggestion / Feedback</div>
+      <div class="feedback-box">
+        <textarea id="feedback-input" class="feedback-textarea" placeholder="Share your suggestion here. Max 50 words."></textarea>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:10px;">Once sent it cannot be edited or resent.</p>
+      <div class="feedback-actions">
+        <button id="feedback-btn" class="feedback-btn" onclick="submitFeedback()">
+          <span class="material-icons" style="font-size:16px;">share</span> Share
+        </button>
+      </div>
+      <p id="feedback-msg" style="font-size:13px;display:none;margin-top:12px;font-weight:600;text-align:center;"></p>
+    </div>
+
+    <!-- CLOCK -->
+    <div class="live-clock">
+      <span class="clock-time" id="clock-time">--:--:-- --</span>
+      <span id="clock-date">Loading...</span>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="app-footer">
+    <span class="footer-credit">Made with <span class="footer-heart">❤️</span>&nbsp; Developed by Khushi</span>
+  </div>
+
+  <script>
+    let currentUserId = null;
+    let globalAttendanceEnabled = false;
+    let studentClasses = [];
+    let alreadyMarkedToday = false;
+
+    /* Default marks — shown immediately, before Firestore responds */
+    const DEFAULT_MARKS = [
+      { name: 'Mid Term Marks',  obtained: '', max: 30 },
+      { name: 'End Sem Marks',   obtained: '', max: 60 },
+      { name: 'Practical Marks', obtained: '', max: 15 },
+      { name: 'CAP Marks',       obtained: '', max: 10 }
+    ];
+    const defaultAssignments = [
+      { title: 'Assignment 1', deadline: 'Deadline (27-Feb / 28-Feb)', status: 'submitted', note: '' },
+      { title: 'Assignment 2', deadline: 'Deadline (19-March / 20-March)', status: 'submitted', note: '' },
+      { title: 'Assignment 3', deadline: 'Create the same app using code generation <b>OR</b> hack the app, <b>OR</b> provide an analysis of it from a continuous development perspective.', note: 'Deadline (30-April)', status: 'pending' }
+    ];
+
+    /* ── Render marks immediately with defaults so the div is NEVER empty ── */
+    renderMarks(DEFAULT_MARKS);
+
+    function renderMarks(cats) {
+      let html = '', obt = 0, max = 0;
+      cats.forEach(c => {
+        const o = (c.obtained === '' || c.obtained === null || c.obtained === undefined) ? '-' : parseInt(c.obtained);
+        if (o !== '-') obt += o;
+        max += parseInt(c.max);
+        html += `<div class="marks-row"><span>${c.name}</span><span class="marks-value">${o} / ${c.max}</span></div>`;
+      });
+      document.getElementById('marks-container').innerHTML = html;
+      document.getElementById('total-marks').textContent = `${obt} / ${max}`;
+    }
+
+    /* ── CLOCK ── */
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock-time').textContent =
+        now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      document.getElementById('clock-date').textContent =
+        now.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    setInterval(updateClock, 1000); updateClock();
+
+    /* ── TOAST ── */
+    function showToast(msg, type = 'info', dur = 3000) {
+      const t = document.getElementById('toast-popup');
+      const icons = { success: '✅', error: '❌', info: '🔔' };
+      t.innerHTML = `<span>${icons[type] || '🔔'}</span><span>${msg}</span>`;
+      t.className = `toast-popup ${type} show`;
+      clearTimeout(t._t); t._t = setTimeout(() => { t.className = 'toast-popup'; }, dur);
+    }
+
+    /* ── AVATAR ── */
+    function setAvatar(name) {
+      const seed = encodeURIComponent(name || 'student');
+      document.getElementById('avatar-wrap').innerHTML =
+        `<img src="https://api.dicebear.com/7.x/thumbs/svg?seed=${seed}&backgroundColor=7c3aed,5b21b6&shapeColor=ffffff" alt="avatar" style="width:100%;height:100%;border-radius:50%;"/>`;
+    }
+
+    /* ── AUTH ── */
+    auth.onAuthStateChanged(async function(user) {
+      if (!user) { window.location.href = 'index.html'; return; }
+      currentUserId = user.uid;
+      document.getElementById('main-content').style.display = 'block';
+      listenToGlobalConfig();
+      loadStudentData(user.uid);
+      checkFeedbackLock(user.uid);
+    });
+
+    /* ── FEEDBACK LOCK ── */
+    async function checkFeedbackLock(uid) {
+      const doc = await db.collection('feedback').doc(uid).get();
+      if (doc.exists) {
+        document.getElementById('feedback-input').value    = doc.data().message || '';
+        document.getElementById('feedback-input').disabled = true;
+        document.getElementById('feedback-btn').style.display = 'none';
+        const m = document.getElementById('feedback-msg');
+        m.textContent = 'Your suggestion has already been shared.';
+        m.style.color = 'var(--green)'; m.style.display = 'block';
+      }
+    }
+
+    /* ── GLOBAL CONFIG LISTENER ── */
+    function listenToGlobalConfig() {
+      db.collection('config').doc('global').onSnapshot(doc => {
+        if (!doc.exists) return;
+        globalAttendanceEnabled = doc.data().attendanceEnabled || false;
+        updateAttendanceButton();
+      });
+    }
+
+    function updateAttendanceButton() {
+      const btn  = document.getElementById('mark-attendance-btn');
+      const icon = document.getElementById('btn-icon');
+      const text = document.getElementById('btn-text');
+      if (alreadyMarkedToday) {
+        btn.className = 'btn-active-attendance'; btn.disabled = true;
+        icon.textContent = 'check_circle'; text.textContent = 'MARKED SUCCESSFULLY ✓'; return;
+      }
+      if (globalAttendanceEnabled) {
+        btn.className = 'btn-active-attendance'; btn.disabled = false;
+        icon.textContent = 'touch_app'; text.textContent = 'MARK YOUR ATTENDANCE';
+      } else {
+        btn.className = 'btn-disabled'; btn.disabled = true;
+        icon.textContent = 'lock'; text.textContent = 'ATTENDANCE DISABLED';
+      }
+    }
+
+    /* ── LOAD STUDENT DATA ── */
+    function loadStudentData(uid) {
+
+      /* MARKS — real-time listener
+         FIX: If doc doesn't exist yet (new user), show defaults and create the doc.
+         This prevents new users needing to logout/login to see marks. */
+      db.collection('marks').doc(uid).onSnapshot(snap => {
+        if (snap.exists && snap.data().categories && snap.data().categories.length > 0) {
+          renderMarks(snap.data().categories);
+        } else {
+          renderMarks(DEFAULT_MARKS);
+          /* If doc is completely missing, create it (silent background write) */
+          if (!snap.exists) {
+            db.collection('marks').doc(uid).set({ categories: DEFAULT_MARKS }).catch(() => {});
+          }
+        }
+      });
+
+      /* USER DATA — real-time listener */
+      db.collection('users').doc(uid).onSnapshot(snap => {
+        if (!snap.exists) return;
+        const d = snap.data();
+
+        document.getElementById('student-name').textContent       = d.name || '';
+        document.getElementById('student-enrollment').textContent = d.enrollmentNo || '--';
+        document.getElementById('student-branch-sem').textContent =
+          `Branch: ${d.branch || '--'} | Sem: ${d.semester || '--'}`;
+        setAvatar(d.name);
+
+        const pw = document.getElementById('proxy-badge-wrap');
+        pw.innerHTML = d.proxyFlag
+          ? `<span class="proxy-badge"><span class="material-icons" style="font-size:13px;">warning</span> Proxy Flagged</span>`
+          : `<span class="proxy-badge clean"><span class="material-icons" style="font-size:13px;">verified</span> No Proxy</span>`;
+
+        studentClasses = (d.classes && d.classes.length > 0) ? d.classes : [];
+        const totalClasses = studentClasses.length || 6;
+        const totalAtt = (d.attendance || 0) + (d.oldAttendance || 0);
+        const pct = Math.min((totalAtt / totalClasses) * 100, 100);
+
+        document.getElementById('attendance-count').textContent   = `${totalAtt} / ${totalClasses} Days`;
+        document.getElementById('attendance-bar').style.width     = `${pct}%`;
+        document.getElementById('attendance-percent').textContent = `${pct.toFixed(1)}%`;
+        document.getElementById('old-attendance').textContent     = d.oldAttendance || 0;
+
+        /* Today check */
+        const today = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+        alreadyMarkedToday = studentClasses.some(c => c.date === today && c.attended);
+        updateAttendanceButton();
+
+        /* Attendance table */
+        const tbody = document.getElementById('attendance-list'); tbody.innerHTML = '';
+        studentClasses.forEach((c, i) => {
+          const ico = c.attended
+            ? `<span class="material-icons" style="color:#10b981;font-size:20px;">check_circle</span>`
+            : `<span class="material-icons" style="color:#d1d5db;font-size:20px;">check_circle_outline</span>`;
+          tbody.innerHTML += `<tr><td>${i + 1}</td><td>${c.date}</td><td>${ico}</td></tr>`;
+        });
+        const attendedCount = studentClasses.filter(c => c.attended).length;
+        document.getElementById('details-subtitle').textContent =
+          `${attendedCount} of ${studentClasses.length} classes attended`;
+
+        /* Assignments */
+        const assigns = (d.assignments && d.assignments.length > 0) ? d.assignments : defaultAssignments;
+        document.getElementById('assignments-container').innerHTML = assigns.map((a, i) => {
+          const badge = a.status === 'submitted'
+            ? `<span class="badge-submitted"><span class="material-icons" style="font-size:13px;vertical-align:text-top;margin-right:2px;">check_circle</span>Submitted</span>`
+            : `<span class="badge-pending">Pending</span>`;
+          const note = a.note ? `<p style="color:var(--red);font-weight:600;font-size:12px;margin-top:6px;">${a.note}</p>` : '';
+          const bs   = a.status === 'submitted' ? 'border-color:var(--teal);color:var(--teal);background:var(--teal-light);' : '';
+          return `<div class="assignment-row">
+            <div class="assign-number" style="${bs}">${i + 1}</div>
+            <div class="assign-details">
+              <div class="assign-title">${a.title}</div>
+              <div class="assign-deadline">${a.deadline}</div>${note}
+            </div>
+            <div style="flex-shrink:0;">${badge}</div>
+          </div>`;
+        }).join('');
+      });
+    }
+
+    /* ── ACCORDION ── */
+    function toggleAccordion() {
+      const c = document.getElementById('attendance-details');
+      const i = document.getElementById('accordion-icon');
+      if (c.style.maxHeight) { c.style.maxHeight = null; i.textContent = 'expand_more'; }
+      else { c.style.maxHeight = c.scrollHeight + 'px'; i.textContent = 'expand_less'; }
+    }
+
+    /* ── MARK ATTENDANCE ── */
+    async function markMyAttendance() {
+      if (!globalAttendanceEnabled || alreadyMarkedToday) return;
+      const today = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+
+      /* Sound */
+      try { new Audio('https://res.cloudinary.com/dwrctji5t/video/upload/q_auto/f_auto/v1776401993/click_iivaai.ogg').play().catch(() => {}); } catch(e) {}
+
+      alreadyMarkedToday = true;
+      updateAttendanceButton();
+      showToast('YOUR ATTENDANCE IS MARKED ✅ ', 'success', 4000);
+
+      try {
+        const ref = db.collection('users').doc(currentUserId);
+        const doc = await ref.get();
+        const idx = studentClasses.findIndex(c => c.date === today);
+        if (idx >= 0) { studentClasses[idx].attended = true; }
+        else          { studentClasses.push({ date: today, attended: true }); }
+        await ref.update({ classes: studentClasses, attendance: (doc.data().attendance || 0) + 1 });
+
+        /* AUTO-REFRESH after 3.5s so table updates cleanly */
+        setTimeout(() => { window.location.reload(); }, 3500);
+
+      } catch(e) {
+        alreadyMarkedToday = false;
+        updateAttendanceButton();
+        showToast('Error saving attendance. Please try again.', 'error');
+      }
+    }
+
+    /* ── FEEDBACK ── */
+    async function submitFeedback() {
+      const fb  = document.getElementById('feedback-input').value.trim();
+      const msg = document.getElementById('feedback-msg');
+      if (!fb) { showToast('Please write something first.', 'info'); return; }
+      try {
+        await db.collection('feedback').doc(currentUserId).set({
+          message: fb, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById('feedback-input').disabled = true;
+        document.getElementById('feedback-btn').style.display = 'none';
+        msg.textContent = 'Suggestion shared successfully.'; msg.style.color = 'var(--green)'; msg.style.display = 'block';
+        showToast('Feedback sent!', 'success');
+      } catch(e) { showToast('Error sending feedback.', 'error'); }
+    }
+
+    function logout() { auth.signOut().then(() => { window.location.href = 'index.html'; }); }
+  </script>
+</body>
+</html>

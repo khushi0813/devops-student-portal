@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isLoggedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(uid) {
+      return isLoggedIn() && request.auth.uid == uid;
+    }
+
+    // ── USERS ──
+    match /users/{uid} {
+      allow read:   if isOwner(uid) || isAdmin();
+      allow create: if isLoggedIn() && request.auth.uid == uid;
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── MARKS ──
+    match /marks/{uid} {
+      allow read:   if isOwner(uid) || isAdmin();
+      allow create: if isLoggedIn() && request.auth.uid == uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── FEEDBACK ──
+    match /feedback/{uid} {
+      allow read:   if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) &&
+        !exists(/databases/$(database)/documents/feedback/$(uid));
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ── CONFIG ──
+    match /config/{docId} {
+      allow read:  if isLoggedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── INVITE CODES ──
+    match /inviteCodes/{codeId} {
+
+      // Needed before login
+      allow read: if true;
+
+      // Admin creates codes
+      allow create: if isAdmin();
+
+      // Allow update/delete during registration flow
+      allow update, delete: if true;
+    }
+
+    // ── DEFAULT DENY ──
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
